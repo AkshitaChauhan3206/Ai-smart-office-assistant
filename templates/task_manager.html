@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Task Manager - AI Smart Office{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" id="taskAppWrapper">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">AI Task Manager</h2>
+            <p class="text-muted-custom">Intelligent priority sorting and Focus Mode tracking.</p>
+        </div>
+        <button class="btn btn-warning fw-bold shadow-sm" onclick="toggleFocusMode()">
+            <i class="fas fa-crosshairs me-2"></i> Enter Focus Mode
+        </button>
+    </div>
+
+    <!-- Focus Mode Overlay (Hidden by Default) -->
+    <div id="focusModeView" style="display: none;" class="saas-card p-5 text-center mb-5 border-warning bg-warning bg-opacity-10">
+        <h1 class="display-4 fw-bold text-main mb-3">Focus Mode Active</h1>
+        <p class="text-muted-custom fs-5 mb-5">Minimal distractions. Focus solely on your highest priority task.</p>
+        
+        <div id="focusTaskCard" class="bg-card border-custom p-5 rounded-lg shadow mb-5 text-start mx-auto" style="max-width: 800px;">
+            <!-- Rendered by JS -->
+        </div>
+
+        <div class="pomodoro-timer mb-5">
+            <div class="display-1 fw-bold text-main" id="pomoTime" style="font-feature-settings: 'tnum';">25:00</div>
+            <div class="mt-3">
+                <button class="btn btn-primary me-2" onclick="startTimer()"><i class="fas fa-play"></i> Start Work</button>
+                <button class="btn btn-outline-secondary me-2" onclick="resetTimer(25)"><i class="fas fa-stop"></i> Reset Work</button>
+                <button class="btn btn-outline-success" onclick="resetTimer(5)"><i class="fas fa-coffee"></i> 5m Break</button>
+            </div>
+        </div>
+
+        <button class="btn btn-outline-danger" onclick="toggleFocusMode()">Exit Focus Mode</button>
+    </div>
+
+    <!-- Standard View -->
+    <div id="standardView" class="row g-4">
+        <div class="col-lg-4">
+            <div class="saas-card p-4 sticky-top" style="top: 2rem;">
+                <h5 class="fw-bold mb-4">Quick Add Task</h5>
+                <input type="text" id="taskTitle" class="form-control mb-3" placeholder="Task Title (e.g. Q4 Data Report)">
+                <textarea id="taskDescription" class="form-control mb-3" rows="3" placeholder="Description & requirements"></textarea>
+                
+                <div class="mb-3">
+                    <label class="form-label text-muted-custom small fw-bold">Deadline (optional)</label>
+                    <input type="datetime-local" id="taskDeadline" class="form-control">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label text-muted-custom small fw-bold">Context Link (optional)</label>
+                    <input type="url" id="taskLink" class="form-control" placeholder="https://...">
+                </div>
+
+                <button class="btn btn-primary w-100 py-2" onclick="addTask()">
+                    <span class="btn-text fw-bold"><i class="fas fa-plus me-2"></i> Add Task</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="saas-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0">Prioritized Queue</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadTasks()"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                
+                <div id="taskList" class="d-flex flex-column gap-3">
+                    <!-- JS renders here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let timerInterval;
+let timeLeft = 25 * 60;
+let topPriorityTask = null;
+
+async function addTask() {
+    const title = document.getElementById("taskTitle").value;
+    const description = document.getElementById("taskDescription").value;
+    const deadline = document.getElementById("taskDeadline").value;
+    const taskLink = document.getElementById("taskLink").value;
+
+    if(!title) return alert("Title required.");
+    
+    await fetch("/api/task-manager", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description, deadline, task_link: taskLink })
+    });
+    
+    document.getElementById("taskTitle").value = "";
+    document.getElementById("taskDescription").value = "";
+    document.getElementById("taskDeadline").value = "";
+    document.getElementById("taskLink").value = "";
+    
+    loadTasks();
+}
+
+function getPriorityColor(priority) {
+    if(priority === 'OVERDUE (NOW)') return 'danger';
+    if(priority === 'Do this NOW') return 'warning text-dark';
+    if(priority === 'Do Next') return 'primary';
+    return 'secondary';
+}
+
+async function loadTasks() {
+    const res = await fetch("/api/task-manager");
+    const json = await res.json();
+    const list = document.getElementById("taskList");
+    list.innerHTML = "";
+    topPriorityTask = null;
+
+    if(!json.tasks || json.tasks.length === 0) {
+        list.innerHTML = `<div class="text-center text-muted-custom py-5">Empty queue! Enjoy your day.</div>`;
+        return;
+    }
+
+    json.tasks.forEach(task => {
+        if(task.status !== 'completed' && !topPriorityTask) {
+            topPriorityTask = task; // first uncompleted task is top priority due to backend SQL sorting
+        }
+
+        const isCompleted = task.status === 'completed';
+        const pColor = getPriorityColor(task.priority);
+        
+        let subtasksList = "";
+        if(task.subtasks && task.subtasks.length > 0) {
+            subtasksList = `<div class="mt-3 bg-main p-3 rounded border border-custom">
+                <div class="small fw-bold text-muted-custom mb-2">AI Execution Steps</div>
+                <div class="small">
+                    ${task.subtasks.map(s => `<div><i class="fas fa-angle-right me-2 text-primary"></i>${s}</div>`).join('')}
+                </div>
+            </div>`;
+        }
+        
+        list.innerHTML += `
+        <div class="card bg-card border-custom shadow-sm ${isCompleted ? 'opacity-50' : ''}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="fw-bold mb-0 ${isCompleted ? 'text-decoration-line-through text-muted-custom' : ''}">${task.title}</h5>
+                    <span class="badge bg-${pColor}">${task.priority}</span>
+                </div>
+                <p class="${isCompleted ? 'text-muted' : 'text-muted-custom'} mb-3">${task.description}</p>
+                
+                <div class="d-flex gap-2 flex-wrap text-muted-custom small mb-3">
+                    ${task.deadline ? `<span class="bg-main px-2 py-1 rounded border border-custom"><i class="fas fa-calendar me-1"></i> ${new Date(task.deadline).toLocaleString()}</span>` : ''}
+                    ${task.estimated_time ? `<span class="bg-main px-2 py-1 rounded border border-custom"><i class="fas fa-stopwatch me-1"></i> ${task.estimated_time}</span>` : ''}
+                    ${task.task_link ? `<a href="${task.task_link}" target="_blank" class="bg-main px-2 py-1 rounded border border-custom text-decoration-none"><i class="fas fa-link me-1"></i> Link</a>` : ''}
+                </div>
+                
+                ${subtasksList}
+                
+                <div class="mt-3 text-end border-top border-custom pt-3">
+                    ${!isCompleted ? 
+                        `<button class="btn btn-sm btn-outline-success border-success text-success fw-bold me-2" onclick="completeTask(${task.id})"><i class="fas fa-check me-1"></i> Complete</button>` 
+                        : `<span class="text-success fw-bold me-3"><i class="fas fa-check-circle"></i> Done</span>`
+                    }
+                    <button class="btn btn-sm btn-outline-danger border-danger text-danger" onclick="deleteTask(${task.id})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        </div>
+        `;
+    });
+    
+    renderFocusDetails();
+}
+
+async function completeTask(id) {
+    await fetch(`/api/task-manager/${id}`, { method: "PATCH" });
+    loadTasks();
+}
+async function deleteTask(id) {
+    await fetch(`/api/task-manager/${id}`, { method: "DELETE" });
+    loadTasks();
+}
+
+// Focus Mode Logic
+function toggleFocusMode() {
+    const std = document.getElementById("standardView");
+    const foc = document.getElementById("focusModeView");
+    if(std.style.display === "none") {
+        std.style.display = "flex";
+        foc.style.display = "none";
+        document.body.classList.remove('focus-mode-active');
+        clearTimeout(timerInterval);
+    } else {
+        std.style.display = "none";
+        foc.style.display = "block";
+        document.body.classList.add('focus-mode-active');
+        renderFocusDetails();
+    }
+}
+
+function renderFocusDetails() {
+    const card = document.getElementById("focusTaskCard");
+    card.innerHTML = '';
+    
+    if(!topPriorityTask) {
+        card.innerHTML = `<h3 class="text-success text-center">No pending tasks! You are all caught up.</h3>`;
+        return;
+    }
+    
+    card.innerHTML = `
+        <span class="badge bg-${getPriorityColor(topPriorityTask.priority)} mb-3">${topPriorityTask.priority}</span>
+        <h2 class="fw-bold text-main mb-3">${topPriorityTask.title}</h2>
+        <p class="text-muted-custom fs-5 mb-4">${topPriorityTask.description}</p>
+        <button class="btn btn-lg btn-success w-100 py-3 fw-bold shadow" onclick="completeTask(${topPriorityTask.id})">
+            <i class="fas fa-check-circle me-2"></i> Mark Focus Task Complete
+        </button>
+    `;
+}
+
+// Pomodoro Logic
+function updateDisplay() {
+    let m = Math.floor(timeLeft / 60);
+    let s = timeLeft % 60;
+    document.getElementById("pomoTime").innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        if(timeLeft > 0) { timeLeft--; updateDisplay(); }
+    }, 1000);
+}
+function resetTimer(mins) {
+    clearInterval(timerInterval);
+    timeLeft = mins * 60;
+    updateDisplay();
+}
+
+document.addEventListener("DOMContentLoaded", () => loadTasks());
+</script>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Email Generator - AI Smart Office{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h2 class="fw-bold">Smart Email Generator</h2>
+        <p class="text-muted-custom">Describe your need in natural language. We expand it into a full professional context.</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- Input section -->
+        <div class="col-lg-6">
+            <div class="saas-card p-4">
+                <h5 class="fw-bold mb-4">Draft Details</h5>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label text-muted-custom small text-uppercase fw-bold">Your Name</label>
+                        <input type="text" class="form-control" id="senderName" placeholder="John Doe">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted-custom small text-uppercase fw-bold">Delivery Tone</label>
+                        <select class="form-select" id="emailTone">
+                            <option value="Professional" selected>Professional</option>
+                            <option value="Friendly">Friendly</option>
+                            <option value="Urgent">Urgent</option>
+                            <option value="Apologetic">Apologetic</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-muted-custom small text-uppercase fw-bold">Natural Prompt</label>
+                    <textarea class="form-control" id="emailInput" rows="5"
+                        placeholder="E.g., Write a leave email for fever and explain I will hand over pending work."></textarea>
+                </div>
+
+                <button class="btn btn-primary w-100 py-2" onclick="generateEmail()">
+                    <span class="btn-text fw-bold"><i class="fas fa-magic me-2"></i> Generate Professional Email</span>
+                    <div class="spinner-border spinner-border-sm d-none ms-2" id="emailSpinner"></div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Output section -->
+        <div class="col-lg-6">
+            <div class="saas-card p-4 h-100" id="emailResult" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-custom pb-3">
+                    <h5 class="fw-bold mb-0 text-success"><i class="fas fa-check-circle me-2"></i>Result</h5>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm me-2" onclick="generateEmail()"><i class="fas fa-sync-alt"></i> Improve</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="copyEmail()" id="copyBtn"><i class="fas fa-copy"></i> Copy</button>
+                    </div>
+                </div>
+                <div class="email-preview p-4 rounded bg-main text-main border border-custom" style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6;" id="generatedEmailContent">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function generateEmail() {
+    const input = document.getElementById('emailInput').value.trim();
+    const tone = document.getElementById('emailTone').value;
+    const name = document.getElementById('senderName').value.trim();
+    
+    if (input.length < 5) {
+        alert('Please provide more description for the email purpose.');
+        return;
+    }
+
+    const btn = event.target.closest('button');
+    const spinner = document.getElementById('emailSpinner');
+    const btnText = btn.querySelector('.btn-text');
+
+    if(spinner) spinner.classList.remove('d-none');
+    if(btnText) btnText.style.opacity = '0.6';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/generate-email', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({input, tone, name})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            document.getElementById('generatedEmailContent').textContent = result.email;
+            document.getElementById('emailResult').style.display = 'block';
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (error) {
+        alert('Network error. Please try again.');
+    } finally {
+        if(spinner) spinner.classList.add('d-none');
+        if(btnText) btnText.style.opacity = '1';
+        btn.disabled = false;
+    }
+}
+
+function copyEmail() {
+    const emailContent = document.getElementById('generatedEmailContent').innerText;
+    navigator.clipboard.writeText(emailContent).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.innerHTML = '<i class="fas fa-check text-success"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

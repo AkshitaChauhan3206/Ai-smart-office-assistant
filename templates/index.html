@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - AI Smart Office{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-5 align-items-center">
+        <div class="col-md-8">
+            <h2 class="fw-bold mb-1">Welcome back</h2>
+            <p class="text-muted-custom">Here's your office intelligence overview.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Smart Email -->
+        <div class="col-lg-4 col-md-6">
+            <div class="saas-card h-100 p-4 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-lg">
+                        <i class="fas fa-envelope-open-text fa-2x"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-2">Smart Email</h4>
+                <p class="text-muted-custom mb-4 flex-grow-1">Generate multi-paragraph, natural professional emails from just a simple intent phrase.</p>
+                <a href="/email-generator" class="btn btn-primary w-100 mt-auto">Open Tool <i class="fas fa-arrow-right ms-2"></i></a>
+            </div>
+        </div>
+
+        <!-- Spam Classifier -->
+        <div class="col-lg-4 col-md-6">
+            <div class="saas-card h-100 p-4 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div class="p-3 bg-success bg-opacity-10 text-success rounded-lg">
+                        <i class="fas fa-shield-alt fa-2x"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-2">Spam Classifier</h4>
+                <p class="text-muted-custom mb-4 flex-grow-1">Powered by an actual Multinomial Naive Bayes model. Evaluates context and finds trigger keywords instantly.</p>
+                <a href="/spam-classifier" class="btn btn-success w-100 mt-auto">Open Tool <i class="fas fa-arrow-right ms-2"></i></a>
+            </div>
+        </div>
+
+        <!-- Task Manager -->
+        <div class="col-lg-4 col-md-6">
+            <div class="saas-card h-100 p-4 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div class="p-3 bg-warning bg-opacity-10 text-warning rounded-lg">
+                        <i class="fas fa-check-double fa-2x"></i>
+                    </div>
+                    <span class="badge bg-danger">Focus Mode</span>
+                </div>
+                <h4 class="fw-bold mb-2">AI Task Manager</h4>
+                <p class="text-muted-custom mb-4 flex-grow-1">Intelligent urgency sorting, deadline tracking, and an immersive Pomodoro Focus Mode.</p>
+                <a href="/task-manager" class="btn btn-warning w-100 mt-auto text-dark fw-bold">Open Tool <i class="fas fa-arrow-right ms-2"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

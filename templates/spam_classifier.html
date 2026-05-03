@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Spam & TF-IDF Classifier - AI Smart Office{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h2 class="fw-bold">Spam & Priority ML Classifier</h2>
+        <p class="text-muted-custom">Evaluate text using a trained Scikit-Learn Multinomial Naive Bayes model.</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="saas-card p-4 h-100">
+                <div class="mb-4">
+                    <label class="form-label text-muted-custom small text-uppercase fw-bold">Text Corpus</label>
+                    <textarea class="form-control" id="spamInput" rows="6"
+                        placeholder="Paste an email, message, or article here to analyze..."></textarea>
+                </div>
+                
+                <button class="btn btn-success fw-bold w-100 py-2" onclick="classifySpam()">
+                    <span class="btn-text"><i class="fas fa-brain me-2"></i> Classify Sequence</span>
+                    <div class="spinner-border spinner-border-sm d-none ms-2" id="spamSpinner"></div>
+                </button>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="saas-card p-4 h-100" id="classificationResult" style="opacity: 0.5; pointer-events: none; transition: opacity 0.3s;">
+                <h5 class="fw-bold mb-4 border-bottom border-custom pb-2">Analysis Results</h5>
+                
+                <div class="mb-4 text-center">
+                    <h1 class="display-5 fw-bold mb-0" id="predLabel">-</h1>
+                    <span class="badge bg-secondary mb-3" id="confScore">Confidence: 0%</span>
+                </div>
+
+                <div class="mb-4">
+                    <h6 class="fw-bold text-muted-custom small text-uppercase mb-3">Model Probabilities</h6>
+                    
+                    <div class="d-flex justify-content-between mb-1 small">
+                        <span>Spam</span>
+                        <span id="probSpam">0%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 6px;">
+                        <div class="progress-bar bg-danger" id="barSpam" style="width: 0%"></div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-1 small">
+                        <span>Normal</span>
+                        <span id="probNormal">0%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 6px;">
+                        <div class="progress-bar bg-success" id="barNormal" style="width: 0%"></div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-1 small">
+                        <span>Important</span>
+                        <span id="probImportant">0%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 6px;">
+                        <div class="progress-bar bg-primary" id="barImportant" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h6 class="fw-bold text-muted-custom small text-uppercase mb-2"><i class="fas fa-search me-1"></i> Why this result?</h6>
+                    <p class="small text-muted-custom mb-2">Highest TF-IDF weighted features driving this prediction:</p>
+                    <div id="suspiciousFlagsList" class="d-flex flex-wrap gap-2">
+                        <span class="text-muted-custom small">None</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function classifySpam() {
+    const input = document.getElementById('spamInput').value.trim();
+    if (!input) {
+        alert('Please paste text to classify');
+        return;
+    }
+
+    const btn = event.target.closest('button');
+    const spinner = document.getElementById('spamSpinner');
+    const btnText = btn.querySelector('.btn-text');
+
+    spinner.classList.remove('d-none');
+    btnText.style.opacity = '0.6';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/classify-spam', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: input})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayResults(result);
+        } else {
+            alert('Model Error: ' + result.error);
+        }
+    } catch (error) {
+        alert('Analysis error. Please try again.');
+    } finally {
+        spinner.classList.add('d-none');
+        btnText.style.opacity = '1';
+        btn.disabled = false;
+    }
+}
+
+function displayResults(result) {
+    const container = document.getElementById('classificationResult');
+    container.style.opacity = '1';
+    
+    // Pred label
+    const labelUI = document.getElementById('predLabel');
+    labelUI.textContent = result.prediction.toUpperCase();
+    
+    if(result.prediction === 'Spam') labelUI.className = "display-5 fw-bold mb-0 text-danger";
+    else if(result.prediction === 'Important') labelUI.className = "display-5 fw-bold mb-0 text-primary";
+    else labelUI.className = "display-5 fw-bold mb-0 text-success";
+
+    document.getElementById('confScore').textContent = `Confidence: ${result.confidence}%`;
+
+    // Bars
+    const sp = result.probabilities['Spam'] || 0;
+    const nm = result.probabilities['Normal'] || 0;
+    const im = result.probabilities['Important'] || 0;
+    
+    document.getElementById('probSpam').textContent = sp + '%';
+    document.getElementById('barSpam').style.width = sp + '%';
+    
+    document.getElementById('probNormal').textContent = nm + '%';
+    document.getElementById('barNormal').style.width = nm + '%';
+    
+    document.getElementById('probImportant').textContent = im + '%';
+    document.getElementById('barImportant').style.width = im + '%';
+
+    // Flags
+    const flagsList = document.getElementById('suspiciousFlagsList');
+    flagsList.innerHTML = '';
+    
+    if (result.suspicious_flags && result.suspicious_flags.length > 0) {
+        result.suspicious_flags.forEach(flag => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary bg-opacity-25 text-main px-3 py-2 border border-custom';
+            badge.innerHTML = `<i class="fas fa-tag text-muted-custom me-1"></i> ${flag}`;
+            flagsList.appendChild(badge);
+        });
+    } else {
+        flagsList.innerHTML = `<span class="text-muted-custom small">No strong outlier keywords detected.</span>`;
+    }
+}
+</script>
+{% endblock %}
